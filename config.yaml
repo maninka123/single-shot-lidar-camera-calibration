@@ -1,0 +1,42 @@
+# SIMPLE CONFIGURATION
+# Defaults are used for every setting not shown. Change only your data and sensor values.
+
+input:
+  # auto detects direct files, pair folders, matching folders, ROS1, or ROS2.
+  mode: auto
+  image: data/image.png
+  pointcloud: data/cloud.pcd
+
+  # Pair subfolders: each subfolder contains exactly one image and one PCD.
+  # pairs_dir: data/pairs
+
+  # Separate folders: image and PCD pairs must have the same filename stem.
+  # image_dir: data/images
+  # pointcloud_dir: data/pointclouds
+
+  # ROS: set mode above and uncomment. Each bag is one stationary capture.
+  # bags: [data/capture_01.bag, data/capture_02.bag]
+  # image_topic: /camera/image_raw
+  # pointcloud_topic: /livox/lidar
+
+camera:
+  model: fisheye                 # fisheye or pinhole
+  camera_matrix:                 # Replace with YOUR calibrated intrinsics.
+    - [231.9893, 0.0, 241.5045]
+    - [0.0, 231.9992, 181.2087]
+    - [0.0, 0.0, 1.0]
+  distortion: [0.002495, 0.587796, -1.888423, 2.264888]
+
+checkerboard:
+  inner_corners: [6, 9]          # columns, rows (not number of squares)
+  square_size_mm: 41.0           # optional metadata; extrinsics use LiDAR metres
+
+spherical_projection:
+  horizontal_fov_deg: 90.0       # must include the full checkerboard
+  vertical_fov_deg: 90.0
+  forward_axis: [1, 0, 0]        # axes expressed in the point-cloud frame
+  right_axis: [0, -1, 0]
+  down_axis: [0, 0, -1]
+
+# Advanced defaults are listed in README.md. Do not change unless diagnostics
+# show that checkerboard extraction needs tuning.

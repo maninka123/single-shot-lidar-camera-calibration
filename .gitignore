@@ -1,0 +1,13 @@
+outputs/
+data/
+*.bag
+*.db3
+*.mcap
+__pycache__/
+*.py[cod]
+.venv/
+.idea/
+.vscode/
+config.json
+config.local.json
+config.local.yaml

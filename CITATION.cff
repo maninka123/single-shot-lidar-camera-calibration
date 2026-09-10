@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use this implementation, please cite the method paper below."
+title: "Single-Shot LiDAR-Camera Extrinsic Calibration"
+type: software
+authors:
+  - family-names: Ranasinghe
+    given-names: Pasindu
+repository-code: "https://github.com/maninka123/single-shot-lidar-camera-calibration"
+license: MIT
+date-released: 2026-09-10
+preferred-citation:
+  type: conference-paper
+  title: "An Automated Single-Shot LiDAR and Camera Extrinsic Calibration Method Using Image Processing"
+  authors:
+    - family-names: Ranasinghe
+      given-names: Pasindu
+    - family-names: Patra
+      given-names: Dibyayan
+    - family-names: Banerjee
+      given-names: Bikram
+    - family-names: Raval
+      given-names: Simit
+  collection-title: "2025 IEEE International Geoscience and Remote Sensing Symposium (IGARSS)"
+  year: 2025
+  start: 5099
+  end: 5102
+  doi: "10.1109/IGARSS55030.2025.11242429"
