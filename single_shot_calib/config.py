@@ -3,7 +3,7 @@ from pathlib import Path
 import yaml
 
 DEFAULTS={
- "input":{"mode":"auto","image":"data/image.png","pointcloud":"data/cloud.pcd","pairs_dir":None,"image_dir":None,"pointcloud_dir":None,"bags":[],"image_topic":"/camera/image_raw","pointcloud_topic":"/livox/lidar","sync_tolerance_sec":0.05,"merge_window_sec":1.0},
+ "input":{"image":"data/image.png","pointcloud":"data/cloud.pcd","bag":None,"image_topic":"/camera/image_raw","pointcloud_topic":"/livox/lidar","sync_tolerance_sec":0.05,"merge_window_sec":1.0},
  "checkerboard":{"square_size_mm":None},
  "spherical_projection":{"width":600,"height":600,"horizontal_fov_deg":90.0,"vertical_fov_deg":90.0,"forward_axis":[1,0,0],"right_axis":[0,-1,0],"down_axis":[0,0,-1],"minimum_range_m":0.35,"maximum_range_m":20.0},
  "detection":{"camera_upscale_factors":[1,2,3,4,5,6],"maximum_corner_candidates":1800,"corner_quality":0.003,"minimum_corner_spacing_px":3.0,"lattice_trials":5000,"lattice_tolerance_fraction":0.38,"minimum_lidar_corners":18,"point_recovery_radius_px":2.5,"random_seed":17},

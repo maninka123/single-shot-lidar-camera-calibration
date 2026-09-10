@@ -2,20 +2,12 @@
 # Defaults are used for every setting not shown. Change only your data and sensor values.
 
 input:
-  # auto detects direct files, pair folders, matching folders, ROS1, or ROS2.
-  mode: auto
+  # ONE CAPTURE: provide one camera image and its matching LiDAR point cloud.
   image: data/image.png
   pointcloud: data/cloud.pcd
 
-  # Pair subfolders: each subfolder contains exactly one image and one PCD.
-  # pairs_dir: data/pairs
-
-  # Separate folders: image and PCD pairs must have the same filename stem.
-  # image_dir: data/images
-  # pointcloud_dir: data/pointclouds
-
-  # ROS: set mode above and uncomment. Each bag is one stationary capture.
-  # bags: [data/capture_01.bag, data/capture_02.bag]
+  # OR provide one ROS1 .bag / one ROS2 bag directory and the two topics.
+  # bag: data/capture.bag
   # image_topic: /camera/image_raw
   # pointcloud_topic: /livox/lidar
 

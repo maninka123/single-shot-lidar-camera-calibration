@@ -5,11 +5,6 @@ import cv2
 import numpy as np
 
 
-def load_json(path: Path) -> dict:
-    with path.open("r", encoding="utf-8") as f:
-        return json.load(f)
-
-
 def save_json(path: Path, value: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as f:
@@ -59,27 +54,8 @@ def read_pcd(path: Path) -> tuple[np.ndarray, np.ndarray]:
     return xyz[good],intensity[good]
 
 
-def load_pair(image_path: Path, cloud_path: Path):
+def load_capture(image_path: Path, cloud_path: Path):
     image=cv2.imread(str(image_path),cv2.IMREAD_COLOR)
     if image is None: raise ValueError(f"Cannot read image: {image_path}")
     xyz,intensity=read_pcd(cloud_path)
     return image,xyz,intensity
-
-
-def discover_direct_inputs(root: Path, cfg: dict) -> list[tuple[str,Path,Path]]:
-    inp=cfg["input"]
-    if inp.get("pairs_dir"):
-        pairs=[]
-        for folder in sorted((root/inp["pairs_dir"]).iterdir()):
-            if not folder.is_dir(): continue
-            images=[p for ext in ("*.png","*.jpg","*.jpeg") for p in folder.glob(ext)]
-            clouds=list(folder.glob("*.pcd"))
-            if len(images)==1 and len(clouds)==1:pairs.append((folder.name,images[0],clouds[0]))
-        return pairs
-    if inp.get("image_dir") and inp.get("pointcloud_dir"):
-        images={p.stem:p for ext in ("*.png","*.jpg","*.jpeg") for p in (root/inp["image_dir"]).glob(ext)}
-        clouds={p.stem:p for p in (root/inp["pointcloud_dir"]).glob("*.pcd")}
-        common=sorted(images.keys()&clouds.keys())
-        return [(name,images[name],clouds[name]) for name in common]
-    return [("capture",root/inp["image"],root/inp["pointcloud"])]
-

@@ -1,156 +1,159 @@
-# Single-Shot LiDAR–Camera Extrinsic Calibration
+# Single-Shot LiDAR-Camera Extrinsic Calibration
 
-An independent Python implementation of the method described in **“An Automated Single-Shot LiDAR and Camera Extrinsic Calibration Method Using Image Processing”** by Pasindu Ranasinghe, Dibyayan Patra, Bikram Banerjee, and Simit Raval (IGARSS 2025).
+An independent Python implementation of the method in **“An Automated Single-Shot LiDAR and Camera Extrinsic Calibration Method Using Image Processing”** by Pasindu Ranasinghe, Dibyayan Patra, Bikram Banerjee, and Simit Raval (IGARSS 2025).
 
-This is one generic calibration method. It has no “raw”, “enclosure”, or scenario-specific code. Each image–point-cloud pair is calibrated independently.
+This is a true single-shot calibrator: one stationary capture produces one LiDAR-to-camera extrinsic transform. There are no dataset scenarios or batch-pairing rules.
 
-> This repository is a research reproduction based on the published method description, not the authors’ official reference implementation.
+> This repository is a research reproduction based on the published method description, not an official reference implementation.
 
 ## Method
 
 ```mermaid
 flowchart LR
-    A[One camera image] --> B[Detect and sub-pixel refine<br/>checkerboard corners]
-    C[One LiDAR capture<br/>XYZ + intensity] --> D[Spherical intensity image<br/>600 × 600 default]
-    D --> E[Gaussian derivatives +<br/>corner candidates]
-    E --> F[Fit checkerboard lattice<br/>and recover missing cells]
-    F --> G[Map lattice pixels<br/>back to LiDAR XYZ]
+    A[One camera image] --> B[Detect and refine<br/>checkerboard corners]
+    C[Matching LiDAR cloud<br/>XYZ + intensity] --> D[Spherical intensity image<br/>600 x 600 default]
+    D --> E[Derivative-based<br/>corner candidates]
+    E --> F[Fit virtual checkerboard<br/>lattice]
+    F --> G[Recover corresponding<br/>LiDAR XYZ points]
     B --> H[E-PnP initialization]
     G --> H
-    H --> I[Levenberg–Marquardt<br/>pixel-error refinement]
-    I --> J[LiDAR→camera transform<br/>and diagnostics]
+    H --> I[Levenberg-Marquardt<br/>pixel-error refinement]
+    I --> J[Extrinsic matrices<br/>error + QA overview]
 ```
 
-The implementation follows the paper’s main stages: spherical projection of LiDAR intensity, image-processing-based lattice extraction, a virtual checkerboard lattice with nearest-neighbour recovery, E-PnP initialization, and Levenberg–Marquardt refinement. Four valid checkerboard orderings are tested automatically.
+The pipeline automatically tests the valid checkerboard orientations, chooses the lowest-error physical solution, refines it, evaluates its quality, and creates one visual verification image.
 
-## What you need
+## Required input
 
-- A calibrated camera matrix and distortion coefficients. Camera intrinsics must be known before extrinsic calibration.
-- A flat checkerboard visible completely in both the camera and LiDAR intensity data.
-- One camera image and its corresponding point cloud for each stationary capture.
-- Point clouds in PCD format with `x y z` and preferably `intensity`, or a ROS1/ROS2 bag containing `sensor_msgs/Image` (or `CompressedImage`) and `sensor_msgs/PointCloud2`.
-- Python 3.10 or newer. ROS bag mode must run in a Python environment belonging to the sourced ROS distribution.
+Choose one of these single-capture inputs:
 
-The physical checkerboard cell size is optional because the LiDAR supplies metric 3D points. `square_size_mm` is retained as metadata. `inner_corners` is required: a board with 7 × 10 squares has 6 × 9 inner corners.
+1. One camera image and one corresponding PCD point cloud; or
+2. One ROS1 bag or ROS2 bag directory containing the camera and point-cloud topics.
 
-## Install and run
+You also need:
+
+- calibrated camera matrix and distortion coefficients;
+- a flat checkerboard fully visible to both sensors;
+- checkerboard inner-corner count, written as `[columns, rows]`;
+- PCD fields `x`, `y`, `z`, and preferably `intensity`.
+
+Camera intrinsics must already be known. The physical cell size is optional because LiDAR XYZ points already provide metric scale. For example, a checkerboard containing 7 x 10 squares has 6 x 9 inner corners.
+
+## Installation
 
 ```bash
 python -m venv .venv
 # Windows: .venv\Scripts\activate
 # Linux/macOS: source .venv/bin/activate
 pip install -r requirements.txt
-python calibrate.py --config config.yaml
 ```
 
-Copy `config.yaml` if you want a private configuration, for example `config.local.yaml`; local configs are ignored by Git.
+## Configuration
 
-### Input layouts
+Edit the short, commented [`config.yaml`](config.yaml). Normally only change the input paths, camera intrinsics, checkerboard dimensions, and LiDAR axes/FOV.
 
-Use exactly one of these layouts in `config.yaml`. Keep `mode: auto`; the pipeline selects the correct reader from the fields you provide. Explicit modes remain available if needed.
-
-**One direct pair**
+### Image and PCD
 
 ```yaml
 input:
-  mode: auto
   image: data/image.png
   pointcloud: data/cloud.pcd
 ```
 
-**One pair per subfolder**
+The filenames do not need to match. They only need to represent the same stationary capture.
 
-```text
-data/pairs/
-├── capture_01/  (one image + one .pcd)
-└── capture_02/  (one image + one .pcd)
-```
+### One ROS bag
+
+Comment out or ignore `image` and `pointcloud`, then set:
 
 ```yaml
 input:
-  mode: auto
-  pairs_dir: data/pairs
-```
-
-**Matching names in separate folders**
-
-`data/images/pose_01.png` is paired with `data/pointclouds/pose_01.pcd`.
-
-```yaml
-input:
-  mode: auto
-  image_dir: data/images
-  pointcloud_dir: data/pointclouds
-```
-
-**ROS1 or ROS2 bags**
-
-Each bag is treated as a separate stationary capture. The closest camera frame is selected and point clouds in a 1-second window are merged by default.
-
-```yaml
-input:
-  mode: auto
-  bags: [data/pose_01.bag, data/pose_02.bag]
+  bag: data/capture.bag       # ROS1 .bag or ROS2 bag directory
   image_topic: /camera/image_raw
   pointcloud_topic: /livox/lidar
 ```
 
-For ROS2, each item in `bags` is normally the bag directory containing `metadata.yaml` and `.db3`/`.mcap` storage.
+The bag reader automatically selects the image closest to the cloud sequence and merges clouds within the default one-second stationary window. The checkerboard and sensors must not move during that interval.
 
-## Simple configuration
+### Camera and target
 
-The provided `config.yaml` is intentionally short and commented. Normally change only:
+```yaml
+camera:
+  model: fisheye             # fisheye or pinhole
+  camera_matrix:
+    - [fx, 0.0, cx]
+    - [0.0, fy, cy]
+    - [0.0, 0.0, 1.0]
+  distortion: [k1, k2, k3, k4]
 
-1. input mode and paths/topics;
-2. camera model, matrix, and distortion;
-3. checkerboard inner-corner count;
-4. LiDAR field of view and axis directions if your frame differs.
+checkerboard:
+  inner_corners: [6, 9]
+  square_size_mm: 41.0       # optional metadata
+```
 
-Built-in defaults should not be changed unless diagnostics show a problem:
+For a pinhole camera, use the distortion coefficients produced by its intrinsic calibration.
+
+## Run
+
+```bash
+python calibrate.py --config config.yaml
+```
+
+No manual point selection or initial extrinsic estimate is required.
+
+## Automatic defaults
+
+Do not change these unless the overview shows a detection problem:
 
 | Parameter | Default | Purpose |
 |---|---:|---|
-| spherical image | 600 × 600 px | Paper’s LiDAR intensity-image resolution |
-| range | 0.35–20 m | Reject implausible calibration returns |
-| camera upscale factors | 1–6× | Find small checkerboards robustly |
-| maximum candidates | 1800 | Limit derivative-corner search |
-| lattice trials | 5000 | Random lattice hypotheses |
-| lattice tolerance | 0.38 cell | Candidate-to-grid matching tolerance |
-| minimum LiDAR corners | 18 | Minimum correspondences accepted |
-| recovery radius | 2.5 px | Map intensity-image corners back to XYZ |
-| bag sync tolerance | 0.05 s | Maximum image/cloud timestamp difference |
-| bag merge window | 1.0 s | Accumulated LiDAR interval while stationary |
-| optimizer | 300 evaluations | E-PnP followed by LM |
+| spherical intensity image | 600 x 600 px | LiDAR image used by the paper method |
+| accepted range | 0.35-20 m | Reject invalid calibration returns |
+| camera upscaling | 1-6x | Detect small targets |
+| corner candidates | 1800 maximum | Bound the lattice search |
+| lattice hypotheses | 5000 | Automatic checkerboard search |
+| lattice tolerance | 0.38 cell | Support incomplete LiDAR returns |
+| minimum LiDAR corners | 18 | Minimum accepted correspondences |
+| point recovery radius | 2.5 px | Recover XYZ from spherical pixels |
+| bag synchronization | 0.05 s | Maximum nearest timestamp difference |
+| cloud accumulation | 1.0 s | Stationary LiDAR merge interval |
+| LM evaluations | 300 | Nonlinear refinement limit |
+| quality threshold | 3.0 px | Maximum automatic PASS RMS |
 
-Advanced values can be overridden by adding their matching `detection`, `optimization`, or `spherical_projection` key to YAML.
+Advanced values may be overridden by adding the matching `detection`, `optimization`, `quality`, or `spherical_projection` field to YAML.
 
-## Outputs and validation
+## Output
 
-Every capture receives its own `outputs/<capture>/` directory with only two files:
+One run creates only two files in `outputs/`:
 
-- `calibration.json`: both 4 × 4 transforms, rotation, translation in metres, E-PnP and refined reprojection errors, and per-corner errors;
-- `calibration_overview.png`: one combined QA image containing the camera detection, LiDAR intensity lattice, and LiDAR-to-camera projection;
-The root `outputs/summary.json` collects all capture results. The JSON includes an automatic `pass`/`review` quality status; the default pass rule is refined RMS ≤ 3 px and improvement over E-PnP. Always inspect the overview before accepting a transform.
+- `calibration.json`: LiDAR-to-camera and camera-to-LiDAR 4 x 4 matrices, rotation, translation in metres, E-PnP error, refined error, per-corner errors, runtime, and automatic `pass`/`review` status;
+- `calibration_overview.png`: camera checkerboard detection, LiDAR lattice detection, original image, and LiDAR-to-image projection in one QA image.
 
-Generated outputs and input datasets are intentionally ignored by Git. Validate a calibration by checking that projected LiDAR edges align with camera edges, the lattice covers the physical checkerboard, most points have positive camera depth, and the refined RMS error improves on E-PnP. A low scalar error alone is not sufficient if the wrong lattice was selected.
-
-The output transform uses column-vector notation:
+The transform follows column-vector notation:
 
 ```text
-p_camera = R_lidar_to_camera · p_lidar + t_lidar_to_camera
+p_camera = R_lidar_to_camera * p_lidar + t_lidar_to_camera
 ```
 
-## Paper and reported results
+A result passes automatically when LM improves the E-PnP estimate and the final RMS is at most 3 px. Always inspect `calibration_overview.png`: the LiDAR lattice must cover the physical board and projected LiDAR structures must align with the camera image.
 
-- P. Ranasinghe, D. Patra, B. Banerjee, and S. Raval, “An Automated Single-Shot LiDAR and Camera Extrinsic Calibration Method Using Image Processing,” *2025 IEEE International Geoscience and Remote Sensing Symposium (IGARSS)*, pp. 5099–5102, 2025.
+## Paper
+
+P. Ranasinghe, D. Patra, B. Banerjee, and S. Raval, “An Automated Single-Shot LiDAR and Camera Extrinsic Calibration Method Using Image Processing,” *2025 IEEE International Geoscience and Remote Sensing Symposium (IGARSS)*, pp. 5099-5102, 2025.
+
 - DOI: [10.1109/IGARSS55030.2025.11242429](https://doi.org/10.1109/IGARSS55030.2025.11242429)
-- [IEEE Xplore record](https://ieeexplore.ieee.org/document/11242429) · [IGARSS program entry](https://www.2025.ieeeigarss.org/view_paper.php?PaperNum=6165&SessionID=1294)
+- [IEEE Xplore paper](https://ieeexplore.ieee.org/document/11242429)
 
-The paper reports an average final reprojection error of **1.060 px** and runtime under **10 s** for its experiment. Its E-PnP result improved from **1.600 px** initially to **1.060 px** after refinement. These are paper-reported results, not bundled output from this repository; performance will depend on sensors, target visibility, synchronization, and configuration.
+## Results
+
+- Average final reprojection error: **1.060 px**
+- Runtime: **under 10 seconds**
+- E-PnP initial error: **1.600 px**
+- Error after refinement: **1.060 px**
 
 ## Citation
 
-GitHub’s **Cite this repository** control reads [`CITATION.cff`](CITATION.cff). A ready-to-copy paper entry is also provided in [`CITATION.bib`](CITATION.bib).
+GitHub’s **Cite this repository** control reads [`CITATION.cff`](CITATION.cff). A BibTeX entry is available in [`CITATION.bib`](CITATION.bib).
 
 ## License
 
