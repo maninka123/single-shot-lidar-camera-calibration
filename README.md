@@ -4,10 +4,6 @@ Python implementation of the method in **“An Automated Single-Shot LiDAR and C
 
 [Read the paper on IEEE Xplore](https://ieeexplore.ieee.org/document/11242429)
 
-This is a true single-shot calibrator: one stationary capture produces one LiDAR-to-camera extrinsic transform. There are no dataset scenarios or batch-pairing rules.
-
-> This repository is a research reproduction based on the published method description, not an official reference implementation.
-
 ## Method
 
 ```mermaid
