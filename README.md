@@ -9,16 +9,22 @@ This is a true single-shot calibrator: one stationary capture produces one LiDAR
 ## Method
 
 ```mermaid
-flowchart LR
-    A[One camera image] --> B[Detect and refine<br/>checkerboard corners]
-    C[Matching LiDAR cloud<br/>XYZ + intensity] --> D[Spherical intensity image<br/>600 x 600 default]
-    D --> E[Derivative-based<br/>corner candidates]
-    E --> F[Fit virtual checkerboard<br/>lattice]
-    F --> G[Recover corresponding<br/>LiDAR XYZ points]
+flowchart TD
+    A[Camera image] --> B[Detect checkerboard corners]
+    C[LiDAR cloud: XYZ + intensity] --> D[Create spherical intensity image]
+    D --> E[Detect corner candidates]
+    E --> F[Fit virtual checkerboard lattice]
+    F --> G[Recover LiDAR XYZ corners]
     B --> H[E-PnP initialization]
     G --> H
-    H --> I[Levenberg-Marquardt<br/>pixel-error refinement]
-    I --> J[Extrinsic matrices<br/>error + QA overview]
+    H --> I[Levenberg-Marquardt refinement]
+    I --> J[LiDAR-to-camera extrinsic matrices]
+    J --> K[Reprojection error and QA overview]
+
+    style A fill:#dbeafe,stroke:#2563eb,color:#111827
+    style C fill:#dcfce7,stroke:#16a34a,color:#111827
+    style J fill:#fef3c7,stroke:#d97706,color:#111827
+    style K fill:#fef3c7,stroke:#d97706,color:#111827
 ```
 
 The pipeline automatically tests the valid checkerboard orientations, chooses the lowest-error physical solution, refines it, evaluates its quality, and creates one visual verification image.
@@ -153,7 +159,18 @@ P. Ranasinghe, D. Patra, B. Banerjee, and S. Raval, “An Automated Single-Shot 
 
 ## Citation
 
-GitHub’s **Cite this repository** control reads [`CITATION.cff`](CITATION.cff). A BibTeX entry is available in [`CITATION.bib`](CITATION.bib).
+GitHub’s **Cite this repository** control reads [`CITATION.cff`](https://github.com/maninka123/single-shot-lidar-camera-calibration/blob/main/CITATION.cff). A ready-to-copy paper entry is also provided in [`CITATION.bib`](https://github.com/maninka123/single-shot-lidar-camera-calibration/blob/main/CITATION.bib).
+
+```bibtex
+@inproceedings{ranasinghe2025automated,
+  author    = {Ranasinghe, Pasindu and Patra, Dibyayan and Banerjee, Bikram and Raval, Simit},
+  title     = {An Automated Single-Shot {LiDAR} and Camera Extrinsic Calibration Method Using Image Processing},
+  booktitle = {2025 IEEE International Geoscience and Remote Sensing Symposium (IGARSS)},
+  pages     = {5099--5102},
+  year      = {2025},
+  doi       = {10.1109/IGARSS55030.2025.11242429}
+}
+```
 
 ## License
 
