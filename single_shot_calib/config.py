@@ -9,7 +9,7 @@ DEFAULTS={
  "detection":{"camera_upscale_factors":[1,2,3,4,5,6],"maximum_corner_candidates":1800,"corner_quality":0.003,"minimum_corner_spacing_px":3.0,"lattice_trials":5000,"lattice_tolerance_fraction":0.38,"minimum_lidar_corners":18,"point_recovery_radius_px":2.5,"random_seed":17},
  "optimization":{"maximum_iterations":300,"ftol":1e-10,"xtol":1e-10,"gtol":1e-10},
  "quality":{"maximum_reprojection_rmse_px":3.0},"output_dir":"outputs",
- # Robust single-shot refinements (see README "Robust mode").  enabled: false = original paper pipeline.
+ # Reliability updates (README "Updates").  enabled: false = original published pipeline.
  "robust":{"enabled":True,
   "merge_full_capture":True,"camera_median":True,"maximum_frame_deviation":6.0,
   "clahe_fallback":True,"fill_holes":True,

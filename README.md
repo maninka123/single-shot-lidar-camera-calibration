@@ -27,57 +27,6 @@ flowchart TD
 
 The pipeline automatically tests the valid checkerboard orientations, chooses the lowest-error physical solution, refines it, evaluates its quality, and creates one visual verification image.
 
-## Robust mode (updated method)
-
-Robust mode keeps the paper's single-shot core and makes each stage harder to break. It is **on by default**. Set `robust: {enabled: false}` to run the original published pipeline exactly as before.
-
-What does **not** change:
-
-- One stationary capture in, one LiDAR-to-camera extrinsic out.
-- Camera intrinsics are **given** and never re-estimated.
-- The core is still the spherical intensity image → derivative corners → checkerboard lattice → E-PnP → LM.
-
-### What was updated
-
-| Stage | Published method | Robust mode update | Why it is more robust |
-|---|---|---|---|
-| Bag input | Needs a ROS installation | Pure-Python `rosbags` reader (ROS1 `.bag` or ROS2) | Runs on Windows/macOS without ROS |
-| Camera image | The single frame nearest the cloud time | Median of all frames of the stationary capture; frames that moved or changed exposure are dropped | Removes sensor noise; steadier corners in glare |
-| Camera corners | Upscaled corners divided by the scale factor | Pixel-centre mapping `(x+0.5)/s − 0.5`, plus a CLAHE fallback | Removes a bias of up to 0.4 px; finds boards in low contrast |
-| LiDAR cloud | 1 s merge window | Whole stationary capture (e.g. 10 s), with a check that the board did not move | A non-repetitive scan needs time to cover a small board densely |
-| LiDAR intensity image | Scan gaps left empty | Small gaps filled before corner detection | Gaps no longer create false corners |
-| Board search | Lattice RANSAC over the whole image | Also tries planar, board-sized range segments bounded by depth edges (thin bridges like a hanging pole are cut) | Clutter elsewhere in the scene cannot win the lattice search |
-| LiDAR 3D corners | Median XYZ of points near each lattice pixel; only matched corners | Paper lattice as the start, then a **board-plane pattern fit**: plane from the dark (unsaturated) cells, every point moved along its beam onto the plane, ideal black/white pattern fitted to all board points | All corners, every time; range noise and bright-cell range walk no longer shift corners; square size checked |
-| Orientation choice | Lowest-RMS of 4 orderings | Mirrored orderings rejected (the board must face both sensors). A symmetric board (odd × odd squares) is detected, and resolved by an optional rough mounting rotation | No more 90°/180° wrong answers that still report PASS |
-| Refinement | LM | LM, then a robust (Huber) loss | Less sensitive to one bad corner |
-| Quality status | PASS if RMS ≤ 3 px | Also checks cell contrast, cell coverage, square size, board motion and **pose uncertainty**; any failure → REVIEW with a reason | A sub-pixel RMS on a wrong or weak solution is no longer reported as PASS |
-| Output | Extrinsic + RMS | Also rotation/translation uncertainty, review reasons, alternative solutions, LiDAR board diagnostics, a 6-panel overview | Easy to judge whether one capture is enough |
-
-### Before and after on real data
-
-These are 22 real captures (Livox Avia + fisheye camera, 5 × 7 board, enclosure off and on). Each capture was calibrated on its own, with the same given intrinsics, by the published pipeline and by robust mode. The "accuracy" panel applies each single-shot result to the *other* captures' boards, which that result never saw.
-
-![Published vs robust single-shot calibration](docs/robust_vs_paper.png)
-
-**Published pipeline:**
-
-- 15 of 22 captures failed; the LiDAR lattice was not found in a 1 s cloud of this small board.
-- The other 7 all returned a wrong orientation (47–176° off) while reporting **PASS**.
-
-**Robust mode:**
-
-- 7 captures PASS with the correct orientation. Their median error on unseen boards is 12 px, against 191 px for the published results.
-- 6 more have the correct orientation but are flagged REVIEW (weak geometry or low contrast).
-- The 9 wrong results are **all** flagged REVIEW, each with its reason. None passes silently.
-
-### What a single shot cannot do
-
-One small, planar board gives only a few dozen coplanar corners. The board's tilt, and hence the extrinsic, is only loosely constrained. Robust mode reports this as an uncertainty and flags weak cases, but it cannot remove it.
-
-- In the test above, the PASS results are still ~3–27° from a multi-capture calibration of the same rig, whose error is 0.5–1.1 px.
-- For best accuracy, use a larger board that fills more of the image, place it at 1.5–3 m, or combine several captures.
-- Use an **asymmetric** board (even × odd squares, e.g. 7 × 10). A symmetric one (e.g. 5 × 7) needs `robust.approx_rotation_lidar_to_camera`, a rough mounting rotation accurate to about ±45°.
-
 ## Required input
 
 Choose one of these single-capture inputs:
@@ -128,11 +77,7 @@ input:
   pointcloud_topic: /livox/lidar
 ```
 
-In robust mode the bag is read with the pure-Python `rosbags` package, so no ROS installation is needed. It uses the whole stationary recording: the median of all camera frames and every LiDAR frame merged. The image and the board are checked for motion.
-
-With `robust.enabled: false` the original reader is used: it needs ROS, selects the image closest to the cloud sequence, and merges clouds within a one-second window.
-
-In both modes the checkerboard and sensors must not move during the capture.
+The bag reader selects the stationary image and merges the LiDAR clouds of the capture; the checkerboard and sensors must not move during it. No ROS installation is needed (see [Updates](#updates)).
 
 ### Camera and target
 
@@ -161,8 +106,6 @@ python calibrate.py --config config.yaml
 No manual point selection or initial extrinsic estimate is required.
 
 ## Automatic defaults
-
-Robust-mode defaults (board search, pattern fit, quality gates, uncertainty limits) are listed and commented in `single_shot_calib/config.py` under `robust`. Any of them can be overridden in the YAML.
 
 Do not change these unless the overview shows a detection problem:
 
@@ -198,22 +141,32 @@ p_camera = R_lidar_to_camera * p_lidar + t_lidar_to_camera
 
 A result passes automatically when LM improves the E-PnP estimate and the final RMS is at most 3 px. Always inspect `calibration_overview.png`: the LiDAR lattice must cover the physical board and projected LiDAR structures must align with the camera image.
 
-In robust mode, `calibration.json` also contains:
+## Updates
 
-- `review_reasons` – why a result is REVIEW rather than PASS;
-- `uncertainty` – rotation (deg) and translation (mm) standard deviations;
-- `alternative_solutions` – the other lattice orderings and how far they are from the chosen one;
-- `lidar_board` – range, points, square size used vs free fit, cell contrast/coverage, board drift;
-- `camera` – the corner-detection settings used and how many frames went into the median.
+The method above is unchanged: one stationary capture, given camera intrinsics, spherical intensity image, lattice, E-PnP and LM. The following additions make each step more reliable. They are on by default; `robust: {enabled: false}` runs the published pipeline exactly.
 
-The overview has six panels:
+| Step | Published | Updated |
+|---|---|---|
+| Bag input | Needs ROS | Pure-Python reader (`rosbags`), no ROS |
+| Camera image | Nearest frame | Median of all stationary frames |
+| Camera corners | Scaled back by `x/s` | Pixel-centre mapping `(x+0.5)/s-0.5`; contrast fallback for glare |
+| LiDAR cloud | 1 s | Whole stationary capture, board-motion check |
+| Intensity image | Scan gaps kept | Small gaps filled |
+| Board search | Whole image | Also board-sized planar range segments |
+| LiDAR corners | Median XYZ at lattice pixels | Lattice refined by a board-plane checker fit using all board points |
+| Orientation | Lowest RMS of 4 orderings | Mirrored poses rejected; symmetric boards resolved with a rough mounting rotation |
+| Refinement | LM | LM + robust (Huber) loss |
+| Quality check | RMS ≤ 3 px | Also board contrast, coverage, square size, motion and pose uncertainty |
 
-- camera corners;
-- LiDAR intensity image, with the search region, paper lattice and refined corners;
-- board-plane pattern fit;
-- a zoomed corner check (camera vs LiDAR);
-- the median camera image;
-- the LiDAR projection.
+Example: a small board behind an enclosure window. The 1 s cloud is too sparse for the lattice search; the updated steps recover all 24 corners, which land on the camera corners.
+
+![Example of the updated steps on a small board](docs/update_example.png)
+
+Notes:
+
+- **Symmetric boards** (odd × odd squares, e.g. 5 × 7) have two equally good solutions 180° apart. Set `robust.approx_rotation_lidar_to_camera` to a rough rotation (±45°), or use an even × odd board such as 7 × 10.
+- **Extra outputs:** `calibration.json` adds `review_reasons`, `uncertainty` (deg / mm) and `lidar_board` diagnostics; the overview has six panels, including the board-plane fit and a corner check.
+- All update settings are listed in `single_shot_calib/config.py` under `robust`.
 
 ## Paper
 

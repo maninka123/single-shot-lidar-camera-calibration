@@ -30,8 +30,8 @@ spherical_projection:
   right_axis: [0, -1, 0]
   down_axis: [0, 0, -1]
 
-# ROBUST MODE (default on). Same single-shot core with robustness updates; see
-# README "Robust mode". Set enabled: false to run the original paper pipeline.
+# UPDATES (default on): same single-shot method with the reliability updates listed in
+# README "Updates". Set enabled: false to run the original published pipeline.
 robust:
   enabled: true
   # Only needed for a SYMMETRIC board (odd x odd squares, e.g. 5 x 7): rough LiDAR->camera
