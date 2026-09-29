@@ -21,7 +21,7 @@ camera:
 
 checkerboard:
   inner_corners: [6, 9]          # columns, rows (not number of squares)
-  square_size_mm: 41.0           # optional metadata; extrinsics use LiDAR metres
+  square_size_mm: 41.0           # robust mode: used for the LiDAR pattern fit (null = estimated)
 
 spherical_projection:
   horizontal_fov_deg: 90.0       # must include the full checkerboard
@@ -29,6 +29,14 @@ spherical_projection:
   forward_axis: [1, 0, 0]        # axes expressed in the point-cloud frame
   right_axis: [0, -1, 0]
   down_axis: [0, 0, -1]
+
+# ROBUST MODE (default on). Same single-shot core with robustness updates; see
+# README "Robust mode". Set enabled: false to run the original paper pipeline.
+robust:
+  enabled: true
+  # Only needed for a SYMMETRIC board (odd x odd squares, e.g. 5 x 7): rough LiDAR->camera
+  # rotation, accurate to ~45 deg, used to pick between the two 180-deg solutions.
+  approx_rotation_lidar_to_camera: null   # e.g. [[0, 0, -1], [0, 1, 0], [1, 0, 0]]
 
 # Advanced defaults are listed in README.md. Do not change unless diagnostics
 # show that checkerboard extraction needs tuning.
